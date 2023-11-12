@@ -2,8 +2,6 @@
 #include <iostream> 
 #include <cstring> 
 
-//commit 왜 안되냐 
-
 void put2byte(void *dest, uint16_t data){
 	*(uint16_t*)dest = data;
 }
@@ -60,16 +58,23 @@ uint64_t page::find(char *key) {
     for (int i = 0; i < num_data; i++) {
         uint16_t off = *(uint16_t *)((uint64_t)offset_array + i * 2);
         data_region = (void *)((uint64_t)this + (uint64_t)off);
+
+        // Check if stored_key is null
         stored_key = get_key(data_region);
+        if (stored_key == nullptr) {
+            printf("Stored key is null. Something went wrong.\n");
+            return 0;
+        }
 
         if (strcmp(key, stored_key) == 0) {
             return get_val(data_region);
-		}
+        }
     }
 
     // Key not found
     return 0;
 }
+
 
 bool page::insert(char *key, uint64_t val) {
     int num_data = hdr.get_num_data();
@@ -97,6 +102,7 @@ bool page::insert(char *key, uint64_t val) {
     }
 
     // Insert the new record
+    
     uint16_t record_size = sizeof(uint16_t) + strlen(key) + 1 + sizeof(uint64_t);
     uint16_t new_offset = hdr.get_data_region_off() - record_size;
 
@@ -111,7 +117,15 @@ bool page::insert(char *key, uint64_t val) {
 
     // Insert the new record data
     data_region = (void *)((uint64_t)this + (uint64_t)new_offset);
-    put2byte(data_region, record_size);
+    uint16_t actual_record_size = get_record_size(data_region);
+
+    // Check if there is enough space for the new record
+    if (is_full(actual_record_size)) {
+        printf("Page is full. Insertion failed for key=%s, val=%llu\n", key, val);
+        return false;
+    }
+
+    put2byte(data_region, actual_record_size);
     memcpy((void *)((uint64_t)data_region + sizeof(uint16_t)), key, strlen(key) + 1);
     *(uint64_t *)((uint64_t)data_region + sizeof(uint16_t) + strlen(key) + 1) = val;
 
@@ -128,10 +142,19 @@ bool page::is_full(uint64_t inserted_record_size) {
     void *offset_array = hdr.get_offset_array();
 
     // Calculate the available space in the data region
-    uint16_t available_space = data_region_off - sizeof(slot_header) - num_data * sizeof(uint16_t);
+    int used_space = sizeof(slot_header) + num_data * sizeof(uint16_t);
+    int available_space = static_cast<int>(data_region_off) - used_space;
 
-    return available_space < inserted_record_size;
+    // Ensure that available space is at least 0
+    available_space = std::max(available_space, 0);
+
+    // Print information about the available and required space
+    printf("Available space: %d, Required space: %lu\n", available_space, inserted_record_size);
+
+    // Check if there is enough space for the new record
+    return available_space < static_cast<int>(inserted_record_size);
 }
+
 
 void page::defrag(){
 	page *new_page = new page(get_type());
