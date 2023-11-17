@@ -141,16 +141,26 @@ bool page::is_full(uint64_t inserted_record_size) {
     uint16_t data_region_off = hdr.get_data_region_off();
     void *offset_array = hdr.get_offset_array();
 
-    // Calculate the available space in the data region
+    // Calculate the used space in the data region
     int used_space = sizeof(slot_header) + num_data * sizeof(uint16_t);
+
+    // Calculate the available space in the data region
     int available_space = static_cast<int>(data_region_off) - used_space;
 
     // Ensure that available space is at least 0
     available_space = std::max(available_space, 0);
 
     // Check if there is enough space for the new record
-    return available_space < static_cast<int>(inserted_record_size);
+    bool isFull = available_space < static_cast<int>(inserted_record_size);
+
+    // Return true if full, false if not full
+    if (isFull) {
+        return true;
+    } else {
+        return false;
+    }
 }
+
 
 
 void page::defrag(){
