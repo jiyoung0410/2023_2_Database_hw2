@@ -89,7 +89,11 @@ bool page::insert(char *key, uint64_t val) {
         data_region = (void *)((uint64_t)this + (uint64_t)off);
         stored_key = get_key(data_region);
 
-        if (strcmp(key, stored_key) >= 0) {
+       // Compare keys to find the right position
+        if (strcmp(key, stored_key) < 0) {
+            insert_position = i;
+            break;
+        } else {
             insert_position = i + 1;
         }
     }
@@ -97,12 +101,11 @@ bool page::insert(char *key, uint64_t val) {
     // Check if the page is full
     if (is_full(sizeof(uint16_t) + strlen(key) + 1 + sizeof(uint64_t))) {
         // Page is full, insertion fails
-        printf("Page is full. Insertion failed for key=%s, val=%llu\n", key, val);
+        printf("Page is full. Insertion failed for key=%s, val=%llu\n\n", key, val);
         return false;
     }
 
     // Insert the new record
-    
     uint16_t record_size = sizeof(uint16_t) + strlen(key) + 1 + sizeof(uint64_t);
     uint16_t new_offset = hdr.get_data_region_off() - record_size;
 
@@ -112,18 +115,15 @@ bool page::insert(char *key, uint64_t val) {
         *(uint16_t *)((uint64_t)offset_array + (i + 1) * 2) = off;
     }
 
+    // Insert the new offset at the calculated position
+    *(uint16_t *)((uint64_t)offset_array + insert_position * 2) = new_offset;
+
     // Insert the new offset
     *(uint16_t *)((uint64_t)offset_array + insert_position * 2) = new_offset;
 
     // Insert the new record data
     data_region = (void *)((uint64_t)this + (uint64_t)new_offset);
     uint16_t actual_record_size = get_record_size(data_region);
-
-    // Check if there is enough space for the new record
-    if (is_full(actual_record_size)) {
-        printf("Page is full. Insertion failed for key=%s, val=%llu\n", key, val);
-        return false;
-    }
 
     put2byte(data_region, actual_record_size);
     memcpy((void *)((uint64_t)data_region + sizeof(uint16_t)), key, strlen(key) + 1);
@@ -147,9 +147,6 @@ bool page::is_full(uint64_t inserted_record_size) {
 
     // Ensure that available space is at least 0
     available_space = std::max(available_space, 0);
-
-    // Print information about the available and required space
-    printf("Available space: %d, Required space: %lu\n", available_space, inserted_record_size);
 
     // Check if there is enough space for the new record
     return available_space < static_cast<int>(inserted_record_size);
@@ -208,7 +205,9 @@ void page::print(){
 	for(int i=0; i<num_data; i++){
 		off= *(uint16_t *)((uint64_t)offset_array+i*2);	
 		data_region = (void *)((uint64_t)this+(uint64_t)off);
-		record_size = get_record_size(data_region);
+        uint16_t key_length = strlen(get_key(data_region)) + 1;  // 키 길이 + 널 문자(\0)
+        record_size = sizeof(uint16_t) + key_length + sizeof(uint64_t);
+		//record_size = get_record_size(data_region);
 		stored_key = get_key(data_region);
 		stored_val= get_val((void *)stored_key);
 		printf("==========================================================\n");

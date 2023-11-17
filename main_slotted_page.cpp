@@ -18,10 +18,13 @@ int main(){
 		cnt++;
 		val*=cnt;
 		p->insert(key, val);
+		p->print();
+
 	}
 
 	val = 100;
 	cnt = 0;
+	printf("\n");
 	
 	for(i='a'; i<='j'; i++){
 		for(int j=0; j<STRING_LEN-1; j++){
